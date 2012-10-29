@@ -2,6 +2,7 @@ module BowGameDrawer where
 
 import BowGame
 import Graphics.UI.WX
+import Control.Monad (foldM_)
 
 data GameObject =
     Player (Pos Int)
@@ -30,4 +31,9 @@ mkBowObj :: Pos Int -> Int
 mkBowObj p = 1
 
 draw :: DC a -> [GameObject] -> IO ()
-draw dc os = return ()
+draw dc os = foldM_ draw' dc os
+
+draw' dc (Player p) = return dc
+draw' dc (Enemy p) = return dc
+draw' dc (Bow p) = return dc
+draw' dc (Arrow p) = return dc
