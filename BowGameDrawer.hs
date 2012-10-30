@@ -4,36 +4,25 @@ import BowGame
 import Graphics.UI.WX
 import Control.Monad (foldM_)
 
-data GameObject =
-    Player (Pos Int)
-  | Enemy (Pos Int)
-  | Bow (Vec Int)
-  | Arrow (Pos Int)
+draw :: GameState -> BitMapInfo -> DC a -> -> Rect -> IO ()
+draw gameS bminfo dc rect = do
+	drawLife (life gameS) dc rect
+	drawScore (score gameS) (numBM bmInfo) dc rect
+	drawObjs (playerObj:enemObjs) dc rect
+	if bowObj /= Nothing
+		then drawBow (power gameS) (fromJust $ bowObj) dc rect
+		else return ()
+	where
+		playerObj = (pos gameS,manBM bminfo)
+		bowObj = canDraw $ (bow gameS,bowBM bmInfo)
+		enemObjs = map (,enemyBM bmInfo) $ enemies gameS
 
-objects :: GameState -> [Int] -- -> [GameObject]
-objects s = enemiesObj ++ [playerObj,bowObj,arrowObj]  where
-	enemiesObj = map mkEnemyObj $ enemies s
-	playerObj = mkPlayerObj $ pos s
-	bowObj = mkBowObj $ power s -- 引き絞っている時のみ描画
-	arrowObj = mkArrowObj $ bow s
+--残りライフを描画
+drawLife n dc rect = return ()
+drawScore sc bm dc rect = return ()
+drawObjs objs dc rect = return ()
+drawBow pw (bow,bm) dc rect = return ()
 
-mkEnemyObj :: Enemy -> Int
-mkEnemyObj enem = 0
 
-mkPlayerObj :: Pos Int -> Int
-mkPlayerObj p = 1
-
-mkArrowObj :: Maybe (Pos Int) -> Int
-mkArrowObj Nothing = 0
-mkArrowObj (Just p) = 1
-
-mkBowObj :: Pos Int -> Int
-mkBowObj p = 1
-
-draw :: DC a -> [GameObject] -> IO ()
-draw dc os = foldM_ draw' dc os
-
-draw' dc (Player p) = return dc
-draw' dc (Enemy p) = return dc
-draw' dc (Bow p) = return dc
-draw' dc (Arrow p) = return dc
+canDraw (Nothing,_) = Nothing
+canDraw (Just p,bm) = Just (p,bm)
