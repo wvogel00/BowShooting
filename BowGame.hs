@@ -5,7 +5,11 @@ import Data.Maybe
 import Graphics.UI.WX (Bitmap,Point2(..),point)
 import Control.Applicative
 
-data Game a = Game a | End
+width = 600 :: Int
+height = 320 :: Int
+
+data Game a = Start (Point2 Int) | Game a | End Choise
+data Choise = Continue | Quit deriving Eq
 data Command =
       Jump
 	| Shoot
@@ -63,9 +67,9 @@ hitOnPlayer s = (/=[]).filter inHitArea $ enemies s where
 	inHitArea (p,_) = distance p (pos s) < 10
 
 updateGame :: Game GameState -> Command -> Game GameState
-updateGame End _ = End
+updateGame (End lr) _ = End lr
 updateGame (Game s) cm = if life s < 0
-	then End
+	then End Continue
 	else Game GameState {
 		score = score s + point*50,
 		power = power s,
