@@ -2,6 +2,7 @@ import Graphics.UI.WX
 import BowGame
 import BowGameDrawer
 import Data.IORef
+import Control.Applicative
 
 main = start bowGUI
 
@@ -14,10 +15,25 @@ bowGUI = do
 	t <- timer f [interval := 25 ,on command := updateGameState state p]
 
 	set p [ on click := clickEvent state f,
+			on mouse := dealPower state,
 			on enterKey := clickEvent' state f,
 			on rightKey := moveObject state 5,
 			on leftKey  := moveObject state (-5)]
 	--set f [layout := minsize (sz width height) $ widget p]
+
+dealPower :: IORef (Game GameState) -> EventMouse -> IO()
+dealPower sIO mState = do
+	--let pos = mousePos mState
+	s <- readIORef sIO
+	case s of
+		End _ -> return()
+		Start _ -> return ()
+		Game state -> case mState of
+			MouseLeftUp pos _-> if power state == Nothing
+				then return ()
+				else modifyIORef sIO (\(Game st) ->(Game $ st {power = flip sub pos<$>power st}))
+			MouseLeftDown pos _ -> return ()
+			_ -> return ()
 
 --IORefで渡しているので、draw関数を修正する必要、またはonPaint関数を削除する可能性あり
 onPaint :: IORef (Game GameState) -> DC() -> Rect -> IO()
@@ -67,6 +83,7 @@ clickEvent sIO f pt = do
 --オープニングを描画
 drawOpening :: Point2 Int -> DC() -> Rect -> IO()
 drawOpening pos dc area = do
+	dcClear dc
 	drawRect dc (rect (pt 0 0) (sz width height)) [brushColor:=rgb 160 45 12]
 	drawText dc "弓撃ちゲーム" (pt 160 100) [brushColor:=green,font:=fontFixed{_fontSize=25}]
 
@@ -74,6 +91,7 @@ drawOpening pos dc area = do
 drawEnd :: Choise -> DC() -> Rect -> IO()
 drawEnd lr dc area = do
 	let pointer = [pt 60 248,pt 60 272,pt 90 260,pt 60 248]
+	dcClear dc
 	drawRect dc (rect (pt 0 0) (sz width height)) [brushColor:=rgb 20 20 40]
 	drawText dc "ゲームオーバー" (pt 160 100) [color:=red,brushColor:=red,font:=fontFixed{_fontSize=25}]
 	drawText dc "続ける" (pt 100 240) [color:=white,font:=fontFixed{_fontSize=20}]
