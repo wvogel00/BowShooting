@@ -11,14 +11,13 @@ draw gameS dc rec = do
 	drawRect dc (rect (pt 0 0) (sz 600 45)) [brushColor:=lightgrey,brushKind:=BrushSolid]
 	drawLife (life gameS) dc rec
 	drawScore (score gameS) dc rec
-	drawObjs (playerObj:enemObjs) dc rec
+	drawPlayer dc (pos gameS)
+	mapM_ (drawEnemies dc) $ enemies gameS
 	if bowObj /= Nothing
 		then drawPower (power gameS) (Nothing /= bowObj) dc rec
 		else return ()
 	where
-		playerObj = pos gameS
 		bowObj = canDraw $ power gameS
-		enemObjs = map fst $ enemies gameS
 
 --残りライフを描画
 drawLife n dc _ = do 
@@ -34,7 +33,10 @@ drawScore sc dc _ = do
 --主人公と敵を描画
 drawObjs (p:es) dc _ = do
 	drawPlayer dc p
-	foldM_ drawEnemies dc es
+
+drawEnemies :: DC a -> Enemy ->IO()
+drawEnemies dc (pos,vec,r,c) = do
+	circle dc (sub pos $ pt width 0) r [color:=c]
 
 drawPlayer dc pos = do
 	circle dc pos 12 [color:=black]
@@ -43,10 +45,6 @@ drawPlayer dc pos = do
 	line dc hip (add hip $ pt 10 24) [color:=black] where
 		neck = add pos $ pt 0 12
 		hip = add neck $ pt 0 30
-
-drawEnemies dc pos = do
-	circle dc pos 15 [color:=black,brushColor:=blue]
-	return dc
 
 --弓屋のパワーゲージを表示
 drawPower _ False _ _ = return ()

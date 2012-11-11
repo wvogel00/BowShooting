@@ -2,13 +2,13 @@ module BowGame where
 
 import Data.List ((\\),delete)
 import Data.Maybe
-import Graphics.UI.WX (Bitmap,Point2(..),point)
+import Graphics.UI.WX (Bitmap,Point2(..),point,Color(..))
 import Control.Applicative
 
 width = 600 :: Int
 height = 320 :: Int
 
-data Game a = Start (Point2 Int) | Game a | End Choise
+data Game a = Start (Point2 Int) (Vec Int) | Game a | End Choise
 data Choise = Continue | Quit deriving Eq
 data Command =
       Jump
@@ -24,7 +24,7 @@ type Bow = (Pos Int,Vec Int)
 type Pos = Point2
 type Vec = Point2
 
-type Enemy = (Pos Int,Vec Int)
+type Enemy = (Pos Int,Vec Int,Int,Color)
 
 data GameState = GameState {
 	score :: Int,
@@ -33,22 +33,25 @@ data GameState = GameState {
 	pos :: Pos Int,
 	bows :: [Bow],
 	enemies :: [Enemy]
-} deriving (Eq,Ord)
+} deriving Eq
 
 instance Show GameState where
 	show s = "POINT :" ++ show (score s)++ "\n LIFE :" ++ show (life s)
 
-initGameState = GameState{
+initializeGame es = GameState{
 	score = 0,
 	power = Nothing,
 	life = 3,
 	pos = point 50 240,
 	bows = [],
-	enemies = []
+	enemies = es
 	}
 
 add :: (Num a) => Pos a -> Vec a -> Pos a
 add p v = point (pointX p + pointX v) (pointY p + pointY v)
+
+sub :: (Num a) => Pos a -> Vec a -> Pos a
+sub p1 p2 = point (pointX p2 - pointX p1) (pointY p2 - pointY p1)
 
 distance :: Pos Int -> Pos Int -> Float --(Integral a , Integral b) => Pos a -> Pos a -> b
 distance p1 p2 = sqrt.fromIntegral $ (pointX p1 - pointX p2)^2 + (pointY p1 - pointY p2)^2
@@ -58,17 +61,35 @@ aliveEnemies s = if bows s == [] || destroyed == []
 	then (0,enemies s) else (length destroyed,enemies s\\destroyed)
 	where
 		reachPoses = map (\(p,v) -> (add p $point 5 5,v)) $ bows s
-		inHitArea (p1,_) p2 = distance p1 p2 < 10
+		inHitArea (p1,_,_,_) p2 = distance p1 p2 < 10
 		destroyed = filter alives $ enemies s
 		alives enem = any (inHitArea enem) $ map fst reachPoses
 
 hitOnPlayer :: GameState -> Bool
 hitOnPlayer s = (/=[]).filter inHitArea $ enemies s where
-	inHitArea (p,_) = distance p (pos s) < 10
+	inHitArea (p,_,_,_) = distance p (pos s) < 10
 
-updateGame :: Game GameState -> Command -> Game GameState
-updateGame (End lr) _ = End lr
-updateGame (Game s) cm = if life s < 0
+--今の座標と進行方向から進行方向を決定する
+reflect :: Point2 Int -> Vec Int -> Vec Int
+reflect p v = point x' y' where
+	inWidth = notOverWin width $ pointX p + pointX v
+	inHeight = notOverWin height $ pointY p + pointY v
+	x' = if inWidth then pointX v else -pointX v
+	y' = if inHeight then pointY v else -pointY v
+
+notOverWin :: Int -> Int -> Bool
+notOverWin border p = p <= border && 0 <= p
+
+--ゲーム状態の更新を行う
+update :: Game GameState -> Command -> Game GameState
+--Opening
+update (Start pos vec) _ =
+	let pos' = add pos vec
+	in Start pos' $ reflect (add (point 100 30) pos') vec
+--Ending
+update (End lr) _ = End lr
+--Game
+update (Game s) cm = if life s < 0
 	then End Continue
 	else Game GameState {
 		score = score s + point*50,
@@ -82,12 +103,13 @@ updateGame (Game s) cm = if life s < 0
 
 nextPos :: Pos Int -> Command -> Pos Int
 nextPos p (Walk x) = add p (point x $ pointY p)
+nextPos p _ = p
 
 --矢の位置とその矢の飛力を返す
 mkNextBows :: GameState -> Command -> [Bow] -> [Bow]
 mkNextBows s Release bs = (pos s,fromJust $ power s):bs
 mkNextBows s _ bs = if 0 < fst (aliveEnemies s)  --矢が敵にヒット
-	then foldl (flip delete) bs $ snd $ aliveEnemies s
+	then bs --foldl (flip delete) bs i$ snd $ aliveEnemies s
 	else bs
 
 --矢の推進力の減衰関数
