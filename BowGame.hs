@@ -1,5 +1,6 @@
 module BowGame where
 
+import System.Random
 import Data.List ((\\),delete)
 import Data.Maybe
 import Graphics.UI.WX (Bitmap,Point2(..),point,Color(..))
@@ -10,15 +11,7 @@ height = 320 :: Int
 
 data Game a = Start (Point2 Int) (Vec Int) | Game a | End Choise
 data Choise = Continue | Quit deriving Eq
-data Command =
-      Jump
-	| Shoot
-	| Stand
-	| Walk Int
-	| ReStart
-	| Drawing Int Int
-	| Release
-	 deriving Eq
+data Command = Shoot | Stand | Drawing Int Int | Release deriving Eq
 
 type Bow = (Pos Int,Vec Int)
 type Pos = Point2
@@ -38,6 +31,8 @@ data GameState = GameState {
 instance Show GameState where
 	show s = "POINT :" ++ show (score s)++ "\n LIFE :" ++ show (life s)
 
+opening = Start (point 160 100) (point 5 5)
+
 initializeGame es = GameState{
 	score = 0,
 	power = Nothing,
@@ -46,6 +41,8 @@ initializeGame es = GameState{
 	bows = [],
 	enemies = es
 	}
+rand :: Int -> Double
+rand = fst.randomR (0,1.0).mkStdGen
 
 add :: (Num a) => Pos a -> Vec a -> Pos a
 add p v = point (pointX p + pointX v) (pointY p + pointY v)
@@ -67,18 +64,18 @@ aliveEnemies s = if bows s == [] || destroyed == []
 
 hitOnPlayer :: GameState -> Bool
 hitOnPlayer s = (/=[]).filter inHitArea $ enemies s where
-	inHitArea (p,_,_,_) = distance p (pos s) < 10
+	inHitArea (p,_,r,_) = distance p (pos s) < fromIntegral r
 
 --今の座標と進行方向から進行方向を決定する
 reflect :: Point2 Int -> Vec Int -> Vec Int
 reflect p v = point x' y' where
-	inWidth = notOverWin width $ pointX p + pointX v
-	inHeight = notOverWin height $ pointY p + pointY v
+	inWidth = notOverWin 0 width $ pointX p + pointX v
+	inHeight = notOverWin 50 height $ pointY p + pointY v
 	x' = if inWidth then pointX v else -pointX v
 	y' = if inHeight then pointY v else -pointY v
 
-notOverWin :: Int -> Int -> Bool
-notOverWin border p = p <= border && 0 <= p
+notOverWin :: Int -> Int -> Int -> Bool
+notOverWin edge1 edge2 p = p < edge2 && edge1 < p
 
 --ゲーム状態の更新を行う
 update :: Game GameState -> Command -> Game GameState
@@ -95,22 +92,21 @@ update (Game s) cm = if life s < 0
 		score = score s + point*50,
 		power = power s,
 		life = if hitOnPlayer s then life s -1 else life s,
-		pos = nextPos (pos s)  cm,
+		pos = pos s,
 		bows = mkNextBows s cm $ bows s,
-		enemies = alives
+		enemies = map moveEnemy alives
 	} where
 		(point,alives) = aliveEnemies s
-
-nextPos :: Pos Int -> Command -> Pos Int
-nextPos p (Walk x) = add p (point x $ pointY p)
-nextPos p _ = p
+		canMove p v = inArea $ add p v
+		inArea p = pointX p>= 0 && pointX p< width && pointY p>= 0 && pointY p<height
+		enemyPos p v = if canMove p v then add p v else p
+		moveEnemy (p,v,r,c) = (enemyPos p v , reflect p v , r , c)
 
 --矢の位置とその矢の飛力を返す
 mkNextBows :: GameState -> Command -> [Bow] -> [Bow]
 mkNextBows s Release bs = (pos s,fromJust $ power s):bs
-mkNextBows s _ bs = if 0 < fst (aliveEnemies s)  --矢が敵にヒット
-	then bs --foldl (flip delete) bs i$ snd $ aliveEnemies s
-	else bs
+mkNextBows s _ bs = filter (inArea.fst) bs where
+	inArea p = notOverWin 0 width (pointX p)&&notOverWin 50 height (pointY p)
 
 --矢の推進力の減衰関数
 attenuate :: Vec Int -> Vec Int
